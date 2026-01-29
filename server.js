@@ -4,20 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Slack 앱 초기화 (재연결 강화)
+// Slack 앱 초기화 (Railway 최적화)
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   signingSecret: process.env.SLACK_SIGNING_SECRET,
   socketMode: true, // Socket Mode 사용 (방화벽 뒤에서도 작동)
   appToken: process.env.SLACK_APP_TOKEN,
-  port: process.env.PORT || 3000,
-  // 재연결 설정 강화
-  clientOptions: {
-    retryConfig: {
-      retries: 10, // 재시도 횟수 증가
-      factor: 2
-    }
-  }
+  // Railway에서는 PORT 변수 사용 안 함 (Socket Mode)
+  logLevel: 'INFO'
 });
 
 // 알림 받을 그룹 멤버들
@@ -100,23 +94,29 @@ app.message(/ppop/i, async ({ message, say, client }) => {
   }
 });
 
-// 앱 시작 (에러 처리 강화)
+// 앱 시작 (Railway 최적화)
 (async () => {
   try {
     await app.start();
     console.log('⚡️ Slack ppop 알림 봇이 실행되었습니다!');
     console.log('📝 "ppop" 메시지를 보내면', groupMembers.length, '명에게 알림이 전송됩니다.');
     
-    // Keep alive - 연결 유지
+    // Keep alive - 연결 유지 (1분마다로 단축)
     setInterval(() => {
-      console.log('🔄 Keep alive - ' + new Date().toLocaleString('ko-KR'));
-    }, 5 * 60 * 1000); // 5분마다
+      console.log('🔄 Keep alive - ' + new Date().toISOString());
+    }, 60 * 1000); // 1분마다
+    
+    // 프로세스 종료 방지
+    process.on('SIGTERM', () => {
+      console.log('⚠️ SIGTERM 받음 - 정상 종료 중...');
+    });
+    
+    process.on('SIGINT', () => {
+      console.log('⚠️ SIGINT 받음 - 정상 종료 중...');
+    });
     
   } catch (error) {
     console.error('❌ 앱 시작 실패:', error);
-    console.log('🔄 10초 후 재시작 시도...');
-    setTimeout(() => {
-      process.exit(1); // PM2가 자동으로 재시작
-    }, 10000);
+    process.exit(1); // Railway가 자동 재시작
   }
 })();
